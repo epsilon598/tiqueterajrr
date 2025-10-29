@@ -7,8 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" prisma/seed.ts",
-    "tunnel": "ngrok http 3000"
+    "seed": "tsx prisma/seed.ts",
+
+    "tunnel": "ngrok http 3000",
+
+    "dev:venue": "tsx src/scripts/createVenue.ts",
+
+    "seed:seats": "tsx src/scripts/seedSeatsFromCSV.ts",
+
+    "seed:gala": "tsx src/scripts/seedGalaEvent.ts",
+
+    "dev:event": "tsx src/scripts/createEvent"
   },
   "prisma": {
     "seed": "npm run seed"
@@ -42,6 +51,7 @@
     "eslint-config-next": "16.0.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

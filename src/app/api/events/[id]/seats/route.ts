@@ -1,54 +1,61 @@
+// src/app/api/events/[id]/seats/route.ts
 import { prisma } from "@/lib/prisma";
-import { getUnavailableSeatIds, priceForSeat } from "@/lib/tickets";
+import { NextRequest } from "next/server";
 
-export const dynamic = "force-dynamic";
-
-// Next 15+: params llega como Promesa
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ id: string }> }
-) {
-  const { id } = await ctx.params;
-
-  const event = await prisma.event.findUnique({
-    where: { id },
-    include: { venue: { include: { seats: true } } },
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const ev = await prisma.event.findUnique({
+    where: { id: params.id },
+    include: { venue: true },
   });
 
-  if (!event) {
-    return new Response(JSON.stringify({ error: "Event not found" }), { status: 404 });
+  if (!ev || !ev.venue) {
+    return Response.json({ event: null, seats: null }, { status: 404 });
   }
 
-  // asientos ocupados (tickets emitidos/usados + holds vigentes)
-  const unavailable = await getUnavailableSeatIds(event.id);
+  const seats = await prisma.seat.findMany({
+    where: { venueId: ev.venueId },
+    select: {
+      id: true,
+      row: true,
+      col: true,
+      label: true,
+      priceOverride: true, // si no lo usas, no pasa nada
+    },
+    orderBy: [{ row: "asc" }, { col: "asc" }],
+  });
 
-  // construir seats para la UI
-  const seats = event.venue.seats.map((s) => {
-    const p = priceForSeat(event, s); // asegúrate que retorna { price, iva, total } en centavos
+  // Precio base e IVA del evento
+  const basePrice = Number(ev.basePrice ?? 0); // en centavos
+  const ivaRate = Number(ev.ivaRate ?? 0);     // p.ej. 0.19
+
+  const enriched = seats.map((s) => {
+    const price = Number(s.priceOverride ?? basePrice);
+    const iva = Math.round(price * ivaRate);
+    const total = price + iva;
+
     return {
       id: s.id,
       row: s.row,
       col: s.col,
       label: s.label,
-      price: p.price,
-      iva: p.iva,
-      total: p.total,
-      available: !unavailable.has(s.id),
+      price,
+      iva,
+      total,
+      available: true, // 🔸 mientras no tengas holds/ventas, márcalos disponibles
     };
   });
 
-  // ⚠️ IMPORTANTE: la página espera event.venue anidado
   return Response.json({
     event: {
-      id: event.id,
-      name: event.name,
-      date: event.date.toISOString(),
+      id: ev.id,
+      name: ev.name,
+      date: ev.date,
       venue: {
-        name: event.venue.name,
-        rows: event.venue.rows,
-        cols: event.venue.cols,
+        name: ev.venue.name,
+        rows: ev.venue.rows,
+        cols: ev.venue.cols,
       },
     },
-    seats,
+    seats: enriched,
   });
 }
