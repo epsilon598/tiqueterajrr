@@ -41,3 +41,25 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Node/Next
+node_modules/
+.next/
+out/
+dist/
+
+# Env y Prisma
+.env
+.env.local
+.env.*.local
+prisma/dev.db
+prisma/dev.db-journal
+
+# Logs/OS/IDE
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
