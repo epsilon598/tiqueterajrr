@@ -1,0 +1,148 @@
+// This is your Prisma schema file, 
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  name         String?
+  role         Role     @default(USER)
+  provider     String?
+  createdAt    DateTime @default(now())
+
+  orders    Order[]
+  tickets   Ticket[]
+  seatHolds SeatHold[] // contraparte de SeatHold.user
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  venue       Venue    @relation(fields: [venueId], references: [id])
+  venueId     String
+  date        DateTime
+  basePrice   Int
+  ivaRate     Float
+  maxPerUser  Int?
+  createdAt   DateTime @default(now())
+
+  orders    Order[]
+  tickets   Ticket[]
+  seatHolds SeatHold[]
+}
+
+model Venue {
+  id      String  @id @default(cuid())
+  name    String  @unique
+  address String?
+  rows    Int
+  cols    Int
+
+  seats  Seat[]
+  events Event[]
+}
+
+model Seat {
+  id            String @id @default(cuid())
+  venue         Venue  @relation(fields: [venueId], references: [id])
+  venueId       String
+  row           Int
+  col           Int
+  label         String
+  priceOverride Int?
+
+  tickets    Ticket[]
+  holds      SeatHold[] // contraparte de SeatHold.seat
+  orderItems OrderSeat[] // 👈 referencia desde la foto de orden
+}
+
+model Order {
+  id      String @id @default(cuid())
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  event   Event  @relation(fields: [eventId], references: [id])
+  eventId String
+
+  status     OrderStatus @default(PENDING)
+  subtotal   Int
+  iva        Int
+  total      Int
+  paymentRef String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  tickets Ticket[]
+  items   OrderSeat[] // 👈 foto de asientos al crear la orden
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model OrderSeat {
+  id      String @id @default(cuid())
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+  seat    Seat   @relation(fields: [seatId], references: [id])
+  seatId  String
+
+  @@unique([orderId, seatId]) // evita duplicar un asiento dentro de la misma orden
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  order       Order        @relation(fields: [orderId], references: [id])
+  orderId     String
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String
+  event       Event        @relation(fields: [eventId], references: [id])
+  eventId     String
+  seat        Seat         @relation(fields: [seatId], references: [id])
+  seatId      String
+  qrCodeValue String       @unique
+  status      TicketStatus @default(ISSUED)
+  issuedAt    DateTime     @default(now())
+  usedAt      DateTime?
+
+  // Evita duplicar el mismo asiento para el mismo evento:
+  @@unique([eventId, seatId])
+}
+
+enum TicketStatus {
+  ISSUED
+  USED
+  CANCELLED
+}
+
+model SeatHold {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id])
+  eventId   String
+  seat      Seat     @relation(fields: [seatId], references: [id])
+  seatId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, seatId]) // no puedes apartar el mismo asiento dos veces para el mismo evento
+  @@index([userId, eventId])
+}
