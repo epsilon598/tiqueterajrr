@@ -85,9 +85,9 @@ export default function CheckoutClient({ isAdmin }: Props) {
           disabled={loading}
           onClick={payWompi}
           className="border px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
-          title="Redirige al portal seguro de Wompi (sandbox)"
+          title="Redirige al portal seguro de Wompi"
         >
-          {loading ? "Procesando..." : "💳 Pagar con Wompi (sandbox)"}
+          {loading ? "Procesando..." : "💳 Pagar con Wompi"}
         </button>
 
         {/* 🧪 Solo visible si es admin */}
