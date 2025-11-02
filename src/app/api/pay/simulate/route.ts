@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { generateQRDataURL } from "@/lib/tickets";
+import { composeQrWithSeatLabel } from "@/lib/qrImage";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -51,9 +52,15 @@ export async function POST(req: Request) {
         },
       });
 
+      // DataURL -> Buffer -> Componer con label -> DataURL
+      const base64 = qrDataURL.split(",")[1] ?? "";
+      const raw = Buffer.from(base64, "base64");
+      const composed = await composeQrWithSeatLabel(seat.label, raw);
+      const composedDataURL = `data:image/png;base64,${composed.toString("base64")}`;
+
       images.push({
         ticketId: ticket.id,
-        png: qrDataURL,
+        png: composedDataURL,
         filename: `${order.event.name}-seat-${seat.label}.png`,
       });
     }

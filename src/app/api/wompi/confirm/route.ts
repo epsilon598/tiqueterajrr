@@ -1,8 +1,11 @@
+// src/app/api/wompi/confirm/route.ts
 import { prisma } from "@/lib/prisma";
 import { generateQRDataURL } from "@/lib/tickets";
 import { sendTicketsEmail } from "@/lib/mail";
-import { composeQrWithSeatLabel } from "@/lib/qrImage"; // 👈 AÑADIR
+import { composeQrWithSeatLabel } from "@/lib/qrImage";
+import crypto from "node:crypto";
 
+// Mitigar IPv6 en Windows/Node si tu ISP causa timeouts a sandbox
 import { setDefaultResultOrder } from "node:dns";
 setDefaultResultOrder?.("ipv4first");
 
@@ -26,9 +29,13 @@ export async function POST(req: Request) {
   const { orderId, transactionId } = await req.json().catch(() => ({}));
   if (!orderId || !transactionId) return new Response("Invalid payload", { status: 400 });
 
+  // Permite forzar base de Wompi si tu red bloquea sandbox
+  // WOMPI_API_URL=https://sandbox.wompi.co/v1
+  // WOMPI_API_URL=https://production.wompi.co/v1
   const base = process.env.WOMPI_API_URL || "https://sandbox.wompi.co/v1";
   const url = `${base}/transactions/${transactionId}`;
 
+  // 1er intento con timeout + reintento corto
   let resp: Response | null = null;
   try {
     resp = await httpGetWithTimeout(url, 6000);
@@ -69,10 +76,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, status: "PAID", finalized: false });
   }
   if (tr.status !== "APPROVED") {
+    // DECLINED/VOIDED/PENDING: no finalizar
     return Response.json({ ok: true, status: tr.status, finalized: false });
   }
 
-  // Emitir tickets (evitando duplicados)
+  // Emitir tickets sólo si aún no se emitieron
   const existing = await prisma.ticket.findMany({
     where: { orderId: order.id },
     select: { seatId: true },
@@ -87,7 +95,7 @@ export async function POST(req: Request) {
     const qrValue = `TICKET:${order.id}:${it.seatId}:${crypto.randomUUID()}`;
     const qrDataURL = await generateQRDataURL(qrValue);
 
-    // ✅ Convertir DataURL a Buffer y componer con el label
+    // DataURL -> Buffer y componer con el label
     const rawPng = Buffer.from(qrDataURL.split(",")[1] ?? "", "base64");
     const composedPng = await composeQrWithSeatLabel(seatLabel, rawPng);
 
@@ -116,7 +124,7 @@ export async function POST(req: Request) {
       eventName: order.event.name,
       eventDate: order.event.date,
       venueName: order.event.venue.name,
-      tickets: emailTickets, // 👈 filenames incluyen seatLabel
+      tickets: emailTickets, // filenames los pones en mail.ts con seatLabel
     });
   } catch (err) {
     console.error("Email error:", err);

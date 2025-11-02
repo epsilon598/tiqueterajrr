@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateQRDataURL } from "@/lib/tickets";
 import { sendTicketsEmail } from "@/lib/mail";
+import { composeQrWithSeatLabel } from "@/lib/qrImage";
 import crypto from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
     for (const h of holds) {
       if (existingBySeat.has(h.seatId)) continue;
 
+      const seatLabel = h.seat.label;
       const qrValue = `TICKET:${order.id}:${h.seatId}:${crypto.randomUUID()}`;
       const qrDataURL = await generateQRDataURL(qrValue);
 
@@ -81,9 +83,12 @@ export async function POST(req: Request) {
         },
       });
 
+      // DataURL -> Buffer y componer con el label
       const base64 = qrDataURL.split(",")[1] ?? "";
-      const qrPng = Buffer.from(base64, "base64");
-      emailTickets.push({ seatLabel: h.seat.label, qrPng });
+      const raw = Buffer.from(base64, "base64");
+      const composed = await composeQrWithSeatLabel(seatLabel, raw);
+
+      emailTickets.push({ seatLabel, qrPng: composed });
     }
 
     await prisma.order.update({
@@ -109,9 +114,7 @@ export async function POST(req: Request) {
     } catch (err) {
       console.error("❌ Error al enviar email:", err);
     }
-  }
-  // 👇 aquí estaba el paréntesis extra
-  else if (NEGATIVE.has(tr.status) && order.status === "PENDING") {
+  } else if (NEGATIVE.has(tr.status) && order.status === "PENDING") {
     await prisma.order.update({
       where: { id: order.id },
       data: { status: "FAILED", paymentRef: tr.status },
