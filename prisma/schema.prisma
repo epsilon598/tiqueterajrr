@@ -22,6 +22,8 @@ model User {
   orders    Order[]
   tickets   Ticket[]
   seatHolds SeatHold[] // contraparte de SeatHold.user
+
+  passwordResetTokens PasswordResetToken[]
 }
 
 enum Role {
@@ -145,4 +147,16 @@ model SeatHold {
 
   @@unique([eventId, seatId]) // no puedes apartar el mismo asiento dos veces para el mismo evento
   @@index([userId, eventId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  token     String   @unique // token aleatorio que se envía por email
+  expiresAt DateTime // p.ej., ahora + 30 minutos
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, token])
 }

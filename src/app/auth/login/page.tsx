@@ -27,16 +27,15 @@ export default function LoginPage() {
       return;
     }
 
-    // Redirige si el login fue exitoso
     window.location.href = res?.url || "/";
   }
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold mb-3">Login</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 max-w-sm">
+    <div className="p-6 max-w-sm mx-auto">
+      <h1 className="text-xl font-semibold mb-3">Iniciar sesión</h1>
+      <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <input
-          placeholder="Email"
+          placeholder="Correo electrónico"
           type="email"
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -59,6 +58,14 @@ export default function LoginPage() {
           {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>
+
+      {/* ✅ Enlace a recuperación */}
+      <a
+        href="/auth/forgot"
+        className="text-sm underline mt-2 inline-block text-blue-600 hover:text-blue-800"
+      >
+        ¿Olvidaste tu contraseña?
+      </a>
 
       {msg && <p className="mt-3 text-red-600">{msg}</p>}
     </div>
