@@ -1,3 +1,4 @@
+// src/lib/tickets.ts
 import { prisma } from "./prisma";
 import QRCode from "qrcode";
 
@@ -8,13 +9,22 @@ export async function getEventWithVenue(eventId: string) {
   });
 }
 
-export function priceForSeat(event: { basePrice: number; ivaRate: number }, seat: { priceOverride: number | null }) {
-  const price = seat.priceOverride ?? event.basePrice;
-  const iva = Math.round(price * event.ivaRate);
+// 🔹 Asegurar CENTAVOS con heurística
+export function priceForSeat(
+  event: { basePrice: number; ivaRate: number },
+  seat: { priceOverride: number | null }
+) {
+  const rawBase = Number(event.basePrice ?? 0);
+  const baseCents = rawBase < 100000 ? rawBase * 100 : rawBase;
+
+  const rawOverride = seat.priceOverride == null ? null : Number(seat.priceOverride);
+  const overrideCents = rawOverride == null ? null : rawOverride < 100000 ? rawOverride * 100 : rawOverride;
+
+  const price = Number(overrideCents ?? baseCents); // CENTAVOS
+  const iva = Math.round(price * Number(event.ivaRate ?? 0));
   return { price, iva, total: price + iva };
 }
 
-// Asientos ocupados: tickets emitidos no cancelados (eventId, seatId) + holds no expirados
 export async function getUnavailableSeatIds(eventId: string) {
   const tickets = await prisma.ticket.findMany({
     where: { eventId, status: { in: ["ISSUED", "USED"] } },
@@ -28,13 +38,11 @@ export async function getUnavailableSeatIds(eventId: string) {
   });
 
   const set = new Set<string>();
-  tickets.forEach(t => set.add(t.seatId));
-  holds.forEach(h => set.add(h.seatId));
-
-  return set; // Set de seatId ocupados/bloqueados
+  tickets.forEach((t) => set.add(t.seatId));
+  holds.forEach((h) => set.add(h.seatId));
+  return set;
 }
 
-// Genera QR DataURL a partir de un valor único
 export async function generateQRDataURL(value: string) {
   return QRCode.toDataURL(value, { errorCorrectionLevel: "M" });
 }

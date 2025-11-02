@@ -96,7 +96,7 @@ async function main() {
       description:
         "Un evento especial de temporada, con música, luces y reencuentros inolvidables.",
       venueId: venue.id,
-      date: new Date("2025-12-01T15:00:00-05:00"),
+      date: new Date("2025-12-01T17:00:00-05:00"),
       basePrice: 50000,
       ivaRate: 0.19,
       maxPerUser: null,

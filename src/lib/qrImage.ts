@@ -1,4 +1,3 @@
-// src/lib/qrImage.ts
 import sharp from "sharp";
 
 /**

@@ -1,9 +1,8 @@
-// src/app/api/wompi/confirm/route.ts
 import { prisma } from "@/lib/prisma";
 import { generateQRDataURL } from "@/lib/tickets";
 import { sendTicketsEmail } from "@/lib/mail";
+import { composeQrWithSeatLabel } from "@/lib/qrImage"; // 👈 AÑADIR
 
-// 👇 Mitiga problemas de IPv6 en Windows/Node
 import { setDefaultResultOrder } from "node:dns";
 setDefaultResultOrder?.("ipv4first");
 
@@ -27,32 +26,23 @@ export async function POST(req: Request) {
   const { orderId, transactionId } = await req.json().catch(() => ({}));
   if (!orderId || !transactionId) return new Response("Invalid payload", { status: 400 });
 
-  // Permite forzar otra base de Wompi si tu red bloquea sandbox
-  // Ejemplos:
-  //   WOMPI_API_URL=https://sandbox.wompi.co/v1
-  //   WOMPI_API_URL=https://production.wompi.co/v1
-  //   WOMPI_API_URL=https://api-sandbox.co/v1  (si tu ISP resuelve así)
   const base = process.env.WOMPI_API_URL || "https://sandbox.wompi.co/v1";
   const url = `${base}/transactions/${transactionId}`;
 
-  // 1er intento con timeout
   let resp: Response | null = null;
   try {
     resp = await httpGetWithTimeout(url, 6000);
-  } catch (e) {
-    // DNS/timeout. Reintento corto.
+  } catch {
     await delay(500);
     try {
       resp = await httpGetWithTimeout(url, 6000);
     } catch (e2) {
       console.error("Wompi lookup failed (network):", e2);
-      // En vez de 500, devolver “no finalizado” para que el cliente siga en PENDING
       return Response.json({ ok: true, status: "PENDING", finalized: false });
     }
   }
 
   if (!resp || !resp.ok) {
-    // No tumbar el flujo: mantén PENDING
     return Response.json({ ok: true, status: "PENDING", finalized: false });
   }
 
@@ -79,19 +69,27 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, status: "PAID", finalized: false });
   }
   if (tr.status !== "APPROVED") {
-    // DECLINED/VOIDED/PENDING: no finalizar
     return Response.json({ ok: true, status: tr.status, finalized: false });
   }
 
-  // Emitir tickets sólo si aún no se emitieron
-  const existing = await prisma.ticket.findMany({ where: { orderId: order.id }, select: { seatId: true } });
+  // Emitir tickets (evitando duplicados)
+  const existing = await prisma.ticket.findMany({
+    where: { orderId: order.id },
+    select: { seatId: true },
+  });
   const issued = new Set(existing.map((t) => t.seatId));
   const emailTickets: { seatLabel: string; qrPng: Buffer }[] = [];
 
   for (const it of order.items) {
     if (issued.has(it.seatId)) continue;
+
+    const seatLabel = it.seat.label;
     const qrValue = `TICKET:${order.id}:${it.seatId}:${crypto.randomUUID()}`;
     const qrDataURL = await generateQRDataURL(qrValue);
+
+    // ✅ Convertir DataURL a Buffer y componer con el label
+    const rawPng = Buffer.from(qrDataURL.split(",")[1] ?? "", "base64");
+    const composedPng = await composeQrWithSeatLabel(seatLabel, rawPng);
 
     await prisma.ticket.create({
       data: {
@@ -104,8 +102,7 @@ export async function POST(req: Request) {
       },
     });
 
-    const base64 = qrDataURL.split(",")[1] ?? "";
-    emailTickets.push({ seatLabel: it.seat.label, qrPng: Buffer.from(base64, "base64") });
+    emailTickets.push({ seatLabel, qrPng: composedPng });
   }
 
   await prisma.order.update({ where: { id: order.id }, data: { status: "PAID" } });
@@ -119,7 +116,7 @@ export async function POST(req: Request) {
       eventName: order.event.name,
       eventDate: order.event.date,
       venueName: order.event.venue.name,
-      tickets: emailTickets,
+      tickets: emailTickets, // 👈 filenames incluyen seatLabel
     });
   } catch (err) {
     console.error("Email error:", err);

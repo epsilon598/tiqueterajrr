@@ -53,15 +53,15 @@ export async function POST(req: Request) {
     }
   }
 
-  // 6) Totales por asiento
+  // 6) Totales por asiento — priceForSeat debe devolver CENTAVOS
   let subtotal = 0;
   let iva = 0;
   for (const h of holds) {
-    const p = priceForSeat(event, h.seat);
+    const p = priceForSeat(event, h.seat); // { price, iva } en centavos
     subtotal += p.price;
     iva += p.iva;
   }
-  const total = subtotal + iva;
+  const total = subtotal + iva; // centavos
 
   // 7) Crea orden + "foto" de asientos (OrderSeat)
   const order = await prisma.order.create({
@@ -79,13 +79,13 @@ export async function POST(req: Request) {
     include: { items: { include: { seat: true } } },
   });
 
-  // 8) (Importante) NO borramos holds aquí; se borran al emitir tickets tras pago aprobado
+  // 8) No borrar holds aquí. Se liberan/cierran tras pago aprobado.
 
   // 9) Respuesta
   return Response.json({
     ok: true,
     orderId: order.id,
-    amount: total,
+    amount: total,        // CENTAVOS — así lo espera Wompi
     currency: "COP",
     items: order.items.map((it) => ({ seatId: it.seatId, label: it.seat.label })),
   });

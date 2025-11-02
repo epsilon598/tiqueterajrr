@@ -17,7 +17,6 @@ export default function LoginPage() {
       redirect: false,
       email: form.email,
       password: form.password,
-      // adónde quieres ir al terminar:
       callbackUrl: "/",
     });
 
@@ -27,12 +26,9 @@ export default function LoginPage() {
       setMsg("Credenciales inválidas");
       return;
     }
-    // si no hay error:
-    window.location.href = res?.url || "/";
-  }
 
-  async function loginGoogle() {
-    await signIn("google", { callbackUrl: "/" });
+    // Redirige si el login fue exitoso
+    window.location.href = res?.url || "/";
   }
 
   return (
@@ -44,25 +40,25 @@ export default function LoginPage() {
           type="email"
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-          className="border p-2"
+          className="border p-2 rounded"
+          required
         />
         <input
           placeholder="Contraseña"
           type="password"
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
-          className="border p-2"
+          className="border p-2 rounded"
+          required
         />
-        <button disabled={loading} className="bg-black text-white p-2">
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-black text-white p-2 rounded hover:bg-gray-800 disabled:opacity-50"
+        >
           {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>
-
-      <div className="mt-4">
-        <button onClick={loginGoogle} className="border p-2">
-          Continuar con Google
-        </button>
-      </div>
 
       {msg && <p className="mt-3 text-red-600">{msg}</p>}
     </div>

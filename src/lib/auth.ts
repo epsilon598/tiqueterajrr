@@ -1,7 +1,6 @@
+// src/lib/auth.ts
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { NextAuthOptions } from "next-auth";
-import type { JWT } from "next-auth/jwt";
-//import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "./prisma";
@@ -11,11 +10,6 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
-    //GoogleProvider({
-    //  clientId: process.env.GOOGLE_CLIENT_ID || "",
-    //  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    //  allowDangerousEmailAccountLinking: true,
-    //}),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -33,36 +27,27 @@ export const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!ok) return null;
 
-        // Lo que regresas aquí se convierte en "user" en el primer jwt callback
         return { id: user.id, email: user.email, name: user.name ?? undefined };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // 'token' ya es tipo JWT por los tipos de next-auth
-      const t = token as JWT;
+      // Primera vez de login: adjunta uid
+      if (user?.id) token.uid = user.id as string;
 
-      // Primera vez (sign-in) viene 'user'
-      if (user?.id) t.uid = user.id as string;
-
-      // Adjuntamos el rol desde la BD (si existe uid)
-      if (t.uid) {
-        const u = await prisma.user.findUnique({ where: { id: t.uid } });
-        if (u) t.role = u.role as "ADMIN" | "USER";
+      // Adjunta rol desde BD si hay uid
+      if (token.uid) {
+        const u = await prisma.user.findUnique({ where: { id: token.uid } });
+        if (u) token.role = u.role as "ADMIN" | "USER";
       }
-
-      return t;
+      return token;
     },
     async session({ session, token }) {
-      const t = token as JWT;
-
-      if (t.uid) session.userId = t.uid;
-      if (t.role) {
-        session.user = {
-          ...session.user,
-          role: t.role,
-        };
+      // Expone en session para el cliente
+      if (token.uid) session.userId = token.uid;
+      if (token.role) {
+        session.user = { ...session.user, role: token.role };
       }
       return session;
     },

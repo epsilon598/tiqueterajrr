@@ -60,7 +60,8 @@ export default function CheckoutConfirmPage() {
         setMsg("✅ Pago aprobado. Tus boletos fueron enviados a tu correo.");
         break;
       case "FAILED":
-        setMsg("❌ Pago rechazado por el banco. Puedes intentar nuevamente.");
+        // 🔴 Ya NO sugerimos reintentar pagar aquí
+        setMsg("❌ Pago rechazado por el banco.");
         break;
       case "PENDING":
         setMsg("⌛ Pago pendiente. Aguardando confirmación de Wompi…");
@@ -77,7 +78,7 @@ export default function CheckoutConfirmPage() {
     fetchOrder();
 
     const i = setInterval(() => {
-      const st = (order?.status ?? "PENDING") as OrderStatus; // 👈 fuerza la unión correcta
+      const st = (order?.status ?? "PENDING") as OrderStatus;
       if (st === "PAID" || st === "FAILED") {
         clearInterval(i);
         return;
@@ -158,17 +159,11 @@ export default function CheckoutConfirmPage() {
         </div>
       )}
 
+      {/* 🔴 Sin botón de reintento cuando es FAILED */}
       {order?.status === "FAILED" && (
         <div className="mt-4">
           <p className="text-sm mb-2">El intento de pago fue declinado.</p>
-          <div className="flex gap-3">
-            <Link href="/" className="underline text-blue-600">Volver al inicio</Link>
-            {orderId && (
-              <Link href={`/checkout?orderId=${orderId}`} className="underline text-blue-600">
-                Intentar pagar de nuevo
-              </Link>
-            )}
-          </div>
+          <Link href="/" className="underline text-blue-600">Volver al inicio</Link>
         </div>
       )}
 

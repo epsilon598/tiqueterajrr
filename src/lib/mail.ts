@@ -1,4 +1,3 @@
-// src/lib/mail.ts
 import nodemailer from "nodemailer";
 
 function boolFromEnv(v: string | undefined, def = false) {
@@ -6,11 +5,19 @@ function boolFromEnv(v: string | undefined, def = false) {
   return ["1","true","yes","on"].includes(v.toLowerCase());
 }
 
+function safeFilename(s: string): string {
+  return (s || "file")
+    .normalize("NFKD")
+    .replace(/[^\w\s.-]+/g, "")
+    .replace(/\s+/g, "_")
+    .slice(0, 80);
+}
+
 export function createTransport() {
   const host = process.env.SMTP_HOST!;
   const port = Number(process.env.SMTP_PORT || "465");
   const secure =
-    boolFromEnv(process.env.SMTP_SECURE, port === 465) || port === 465; // true para 465 (SSL), false para 587 (STARTTLS)
+    boolFromEnv(process.env.SMTP_SECURE, port === 465) || port === 465;
   const user = process.env.SMTP_USER!;
   const pass = process.env.SMTP_PASS!;
 
@@ -27,7 +34,6 @@ export function createTransport() {
     tls: {
       minVersion: "TLSv1.2",
     },
-    // logger: true, debug: true, // activa si quieres ver más logs
   });
 }
 
@@ -50,8 +56,9 @@ export async function sendTicketsEmail(opts: {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER!;
   const transporter = createTransport();
 
-  const attachments: TicketAttachment[] = opts.tickets.map((t, i) => ({
-    filename: `ticket-${i + 1}-${opts.orderId}.png`,
+  // ✅ Incluir el nombre del asiento en el nombre de archivo
+  const attachments: TicketAttachment[] = opts.tickets.map((t) => ({
+    filename: `${safeFilename(opts.eventName)}_${safeFilename(t.seatLabel)}.png`,
     content: t.qrPng,
     contentType: "image/png",
   }));
