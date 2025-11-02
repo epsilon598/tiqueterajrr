@@ -17,7 +17,11 @@
 
     "seed:gala": "tsx src/scripts/seedGalaEvent.ts",
 
-    "dev:event": "tsx src/scripts/createEvent"
+    "dev:event": "tsx src/scripts/createEvent",
+
+    "clean:all": "tsx src/scripts/cleanTransactional.ts --all",
+    "clean:event": "tsx src/scripts/cleanTransactional.ts",
+    "clean:dry": "tsx src/scripts/cleanTransactional.ts --dry-run"
   },
   "prisma": {
     "seed": "npm run seed"
