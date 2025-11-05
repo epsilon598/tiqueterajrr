@@ -79,7 +79,7 @@ export async function sendTicketsEmail(opts: {
     <p style="color:#666">Tiquetera Virtual</p>
   </div>
   `;
-
+  console.log(`From ${from} to:${opts.to}`)
   await transporter.sendMail({
     from,
     to: opts.to,
@@ -87,6 +87,7 @@ export async function sendTicketsEmail(opts: {
     html,
     attachments,
   });
+  console.log("Enviado")
 }
 
 /* ✅ NUEVO: Email de restablecimiento de contraseña */
