@@ -33,6 +33,13 @@ function toRowLetter(n: number) {
   return s;
 }
 
+// Helper: determina la “tarifa” según el precio base en pesos
+function getSeatTier(s: SeatItem): "HIGH" | "LOW" {
+  const pricePesos = Math.round(s.price / 100); // asumiendo price en centavos
+  // 50.000 vs 30.000 — si algún día cambias precios esto es fácil de ajustar
+  return pricePesos >= 50000 ? "HIGH" : "LOW";
+}
+
 export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridClientProps) {
   const router = useRouter();
 
@@ -82,6 +89,7 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
       timerRef.current = null;
     }
   }
+
   async function onExpire() {
     setMessage("Tiempo agotado. Liberando asientos…");
     try {
@@ -93,8 +101,9 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
           body: JSON.stringify({ eventId, seatIds: selected }),
         });
       }
-    } catch {}
-    finally {
+    } catch {
+      // ignoramos errores puntuales
+    } finally {
       setSelected([]);
       setHoldOk(false);
       setExpiresAt(null);
@@ -196,15 +205,19 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
   // ---------- UI ----------
   return (
     <div>
-      {/* Leyenda */}
-      <div className="flex items-center gap-4 text-sm mb-3">
+      {/* Leyenda (incluye colores por precio) */}
+      <div className="flex flex-wrap items-center gap-4 text-sm mb-3">
         <span className="inline-flex items-center gap-2">
           <span className="inline-block w-4 h-3 rounded border border-gray-300 bg-white" />
           Vacío
         </span>
         <span className="inline-flex items-center gap-2">
-          <span className="inline-block w-4 h-3 rounded border border-emerald-600 bg-emerald-100" />
-          Disponible
+          <span className="inline-block w-4 h-3 rounded border border-emerald-700 bg-emerald-100" />
+          Fila $50.000
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block w-4 h-3 rounded border border-amber-600 bg-amber-100" />
+          Fila $30.000
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="inline-block w-4 h-3 rounded border border-blue-600 bg-blue-500" />
@@ -216,14 +229,16 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
         </span>
       </div>
 
-      {/* Cabeceras */}
+      {/* Cabeceras + grilla */}
       <div className="overflow-auto">
         <table className="border-collapse">
           <thead>
             <tr>
               <th className="p-1" />
               {Array.from({ length: cols }).map((_, cIdx) => (
-                <th key={cIdx} className="p-1 text-xs text-gray-600">{cIdx + 1}</th>
+                <th key={cIdx} className="p-1 text-xs text-gray-600">
+                  {cIdx + 1}
+                </th>
               ))}
             </tr>
           </thead>
@@ -246,7 +261,16 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
                   } else if (isSelected) {
                     cls += "bg-blue-500 border-blue-600 text-white shadow-sm ring-2 ring-blue-300 ";
                   } else {
-                    cls += "bg-emerald-100 border-emerald-600 hover:shadow hover:scale-[1.03] cursor-pointer ";
+                    const tier = getSeatTier(s);
+                    if (tier === "HIGH") {
+                      // $50.000
+                      cls +=
+                        "bg-emerald-100 border-emerald-700 hover:shadow hover:scale-[1.03] cursor-pointer ";
+                    } else {
+                      // $30.000
+                      cls +=
+                        "bg-amber-100 border-amber-600 hover:shadow hover:scale-[1.03] cursor-pointer ";
+                    }
                   }
 
                   return (
@@ -297,7 +321,9 @@ export default function SeatGridClient({ eventId, rows, cols, seats }: SeatGridC
           <button
             disabled={loadingCheckout || !holdOk}
             onClick={irCheckout}
-            className={`border px-3 py-1 rounded hover:bg-gray-50 ${holdOk ? "" : "opacity-50 cursor-not-allowed"}`}
+            className={`border px-3 py-1 rounded hover:bg-gray-50 ${
+              holdOk ? "" : "opacity-50 cursor-not-allowed"
+            }`}
             title={holdOk ? "Crear orden" : "Primero debes apartar los asientos"}
           >
             {loadingCheckout ? "Creando orden..." : "Ir a Checkout"}
