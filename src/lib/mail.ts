@@ -51,7 +51,7 @@ export async function sendTicketsEmail(opts: {
   venueName: string;
   tickets: { seatLabel: string; qrPng: Buffer }[];
 }) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER!;
+  const from = process.env.SMTP_USER;
   const transporter = createTransport();
 
   // ✅ Nombre del evento + asiento
