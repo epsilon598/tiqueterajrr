@@ -21,7 +21,7 @@ export function priceForSeat(
   const overrideCents = rawOverride == null ? null : rawOverride < 100000 ? rawOverride * 100 : rawOverride;
 
   const price = Number(overrideCents ?? baseCents); // CENTAVOS
-  const iva = Math.round(price + Number(event.ivaRate ?? 0));
+  const iva = Math.round(price * Number(event.ivaRate ?? 0));
   return { price, iva, total: price + iva };
 }
 
