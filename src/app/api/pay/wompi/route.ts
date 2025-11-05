@@ -17,32 +17,43 @@ export async function POST(req: Request) {
     where: { id: orderId },
     include: { event: true },
   });
-  if (!order || order.userId !== session.userId) return new Response("Not found", { status: 404 });
-  if (order.status !== "PENDING") return new Response("Order not pending", { status: 400 });
+  if (!order || order.userId !== session.userId)
+    return new Response("Not found", { status: 404 });
+  if (order.status !== "PENDING")
+    return new Response("Order not pending", { status: 400 });
 
   // ⚠️ Asegurar número (Prisma Decimal -> number)
-  let amountInCents = Number(order.total); // debe ser ENTERO en centavos
-  // Guardacabo: si accidentalmente llega en pesos (300, 500), conviértelo a centavos.
+  let amountInCents = Number(order.total);
   if (Number.isFinite(amountInCents) && amountInCents > 0 && amountInCents < 1000) {
     amountInCents = Math.round(amountInCents * 100);
   }
 
   const currency = "COP";
   const reference = order.id;
-  const integrityKey = process.env.WOMPI_INTEGRITY_KEY!;
-  const publicKey = process.env.WOMPI_PUBLIC_KEY!;
-  const redirectUrl = `${process.env.NEXTAUTH_URL}/checkout/confirm?orderId=${order.id}`;
+
+  // ✅ Limpieza de variables de entorno
+  const integrityKey = (process.env.WOMPI_INTEGRITY_KEY || "").trim();
+  const publicKey = (process.env.WOMPI_PUBLIC_KEY || "").trim();
+  const redirectUrl = `${(process.env.NEXTAUTH_URL || "").replace(/\/+$/, "")}/checkout/confirm?orderId=${order.id}`;
 
   if (!integrityKey || !publicKey) {
-    return new Response("Wompi not configured (missing INTEGRITY or PUBLIC key)", { status: 500 });
+    return new Response("Wompi not configured (missing INTEGRITY or PUBLIC key)", {
+      status: 500,
+    });
   }
   if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
     return new Response("Invalid amount_in_cents", { status: 500 });
   }
 
-  // Firma de integridad EXACTA: <reference><amount_in_cents><currency><integrity_key>
+  // ✅ Firma de integridad EXACTA
   const preimage = `${reference}${amountInCents}${currency}${integrityKey}`;
   const signature = createHash("sha256").update(preimage).digest("hex");
+
+  // 🧩 Log opcional (puedes borrar en producción)
+  console.log("🔏 Generando firma Wompi:");
+  console.log("Preimage:", preimage);
+  console.log("Signature:", signature);
+  console.log("Amount in cents:", amountInCents);
 
   // URL de Checkout Web
   const params = new URLSearchParams();
