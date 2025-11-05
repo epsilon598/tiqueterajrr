@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   }
 
   // Formato que generamos: TICKET:<orderId>:<seatId>:<uuid>
-  if (!qr.startsWith("TICKET:")) {
+  if (!qr.startsWith("TICKET")) {
     return new Response(JSON.stringify({ error: "Formato QR desconocido" }), { status: 400 });
   }
 
