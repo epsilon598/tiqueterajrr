@@ -65,6 +65,19 @@ export async function POST(req: Request) {
       });
     }
 
+    // 🧨 AQUÍ ES DONDE SE BORRAN LOS SEATHOLD DE ESOS MISMOS ASIENTOS
+    const seatIds = order.items.map((item) => item.seatId);
+
+    if (seatIds.length > 0) {
+      await prisma.seatHold.deleteMany({
+        where: {
+          userId: order.userId,
+          eventId: order.eventId,
+          seatId: { in: seatIds },
+        },
+      });
+    }
+
     return Response.json({ ok: true, count: images.length, images });
   } catch (err) {
     console.error("[/api/pay/simulate] error:", err);
